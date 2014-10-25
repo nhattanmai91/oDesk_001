@@ -1,0 +1,121 @@
+//Edited: Tan M.
+//Date: 25-Oct-2014
+//Status: done
+
+#include "ST7565.h"
+#include "URMSerial.h"
+
+// the LCD backlight is connected up to a pin so you can turn it on & off
+#define BACKLIGHT_LED 10
+
+// The measurement we're taking
+#define DISTANCE 1
+#define TEMPERATURE 2
+#define ERROR 3
+#define NOTREADY 4
+#define TIMEOUT 5
+
+#define LOGO16_GLCD_HEIGHT 16 
+#define LOGO16_GLCD_WIDTH  16 
+
+URMSerial urm;
+
+/*CONNECTIONS*/
+// VCC   (Arduino)   -> Pin 1 VCC (URM37 V3.2)
+// GND   (Arduino)   -> Pin 2 GND (URM37 V3.2)
+// Pin 3 (Arduino)   -> Pin 9 TXD (URM37 V3.2)
+// Pin 2 (Arduino)   -> Pin 8 RXD (URM37 V3.2)
+// Pin 9 (Arduino)   -> Pin 9 (4050)
+// Pin 8 (Arduino)   -> Pin 11 (4050)
+// Pin 7 (Arduino)   -> Pin 7 (4050)
+// Pin 6 (Arduino)   -> Pin 5 (4050)
+// Pin 5 (Arduino)   -> Pin 3 (4050)
+// Pin 1 (4050)      -> 3.3V (Arduino)
+// Pin 8 (4050)      -> GND (Arduino)
+// Pin 10,11 (LCD)   -> GND
+// Pin 9 (LCD)       -> 3.3V (Arduino) or 15 (4050)
+// Pin 7,8 (LCD)     -> GND
+// Pin 6 (LCD)       -> 3.3V (Arduino)
+// Pin 5 (LCD)       -> 10 (4050)
+// Pin 4 (LCD)       -> 12 (4050)
+// Pin 3 (LCD)       -> 6 (4050)
+// Pin 2 (LCD)       -> GND
+// Pin 1 (LCD)       -> 2 (4050)
+
+ST7565 glcd(9, 8, 7, 6, 5);
+
+void setup()   {                
+  Serial.begin(9600);
+
+  /*LCD*/
+  Serial.print(freeRam());
+  // turn on backlight
+  pinMode(BACKLIGHT_LED, OUTPUT);
+  digitalWrite(BACKLIGHT_LED, HIGH);
+  // initialize and set the contrast to 0x18
+  glcd.begin(0x18);//have to be exact  
+  // draw a string at location (colume,line)
+  glcd.drawstring(0, 0, "This is oDesk_001");
+  glcd.drawstring(0, 2, "Tan M.");
+  glcd.display(); //display things from buffer to screen
+  delay(2000);
+  glcd.clear(); //clear buffer
+  //glcd.display(); //if you want to show empty buffer to screen
+
+  /*Sensor*/
+  urm.begin(2,3,9600);                 // RX Pin, TX Pin, Baud Rate
+}
+
+void loop(){
+  int num=0;
+  char label_distance[]="Distance: ";
+  glcd.drawstring(0,0,label_distance);
+  glcd.drawnumber(strlen(label_distance)*6,0,getMeasurement());
+  glcd.display();
+  glcd.clear(); //has to be cleared to update new number    
+  delay(50); //wait sensor responses
+}
+
+/*For LCD*/
+// this handy function will return the number of bytes currently free in RAM, great for debugging!   
+int freeRam(void)
+{
+  extern int  __bss_end; 
+  extern int  *__brkval; 
+  int free_memory; 
+  if((int)__brkval == 0) {
+    free_memory = ((int)&free_memory) - ((int)&__bss_end); 
+  }
+  else {
+    free_memory = ((int)&free_memory) - ((int)__brkval); 
+  }
+  return free_memory; 
+}
+
+/*for Sensor*/
+int getMeasurement()
+{
+  int value; // This value will be populated
+  // Request a distance reading from the URM37
+  switch(urm.requestMeasurementOrTimeout(DISTANCE, value)) // Find out the type of request
+  {
+  case DISTANCE: // Double check the reading we recieve is of DISTANCE type
+    //    Serial.println(value); // Fetch the distance in centimeters from the URM37
+    return value;
+    break;
+  case TEMPERATURE:
+    return value;
+    break;
+  case ERROR:
+    Serial.println("Error");
+    break;
+  case NOTREADY:
+    Serial.println("Not Ready");
+    break;
+  case TIMEOUT:
+    Serial.println("Timeout");
+    break;
+  } 
+
+  return -1;
+}
